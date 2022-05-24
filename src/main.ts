@@ -8,41 +8,36 @@ async function run() {
     const token = core.getInput("github-token", { required: true });
     const github = new GitHub(token, {});
 
-    // Check if the body contains required string
-    const bodyContains = core.getInput("bodyContains");
-    const bodyDoesNotContain = core.getInput("bodyDoesNotContain");
+    // Check if the body contains banned strings
+    const additionDoesNotContain = core.getInput("additionDoesNotContain");
 
-    if (bodyContains || bodyDoesNotContain) {
-      if (!context.payload.pull_request.body) {
+    if (additionDoesNotContain) 
+    {
+      if (!context.payload.pull_request.body) 
+      {
         core.setFailed("The body of the PR is empty, can't check");
-      } else {
-        if (
-          bodyContains &&
-          context.payload.pull_request.body.indexOf(bodyContains) < 0
-        ) {
-          core.setFailed("The body of the PR does not contain " + bodyContains);
-        }
-
-        if (
-          bodyDoesNotContain &&
-          context.payload.pull_request.body.indexOf(bodyDoesNotContain) >= 0
-        ) {
-          core.setFailed(
-            "The body of the PR should not contain " + bodyDoesNotContain
-          );
+      } 
+      else 
+      {
+        if (additionDoesNotContain && context.payload.pull_request.body.indexOf(additionDoesNotContain) >= 0)
+          {
+            core.setFailed(
+              "The body of the PR should not contain " + additionDoesNotContain
+            );
         }
       }
     }
 
-    const diffContains = core.getInput("diffContains");
+    
     const diff_url = context.payload.pull_request.diff_url;
     const result = await github.request(diff_url);
     const files = parse(result.data);
     core.exportVariable("files", files);
     core.setOutput("files", files);
-    const filesChanged = +core.getInput("filesChanged");
-    if (filesChanged && files.length != filesChanged) {
-      core.setFailed("You should change exactly " + filesChanged + " file(s)");
+    const filesChangedMaximum = +core.getInput("filesChangedMaximum");
+    if (filesChangedMaximum && files.length > filesChangedMaximum) 
+    {
+      core.setFailed("You cannot submit a PR that changes more than " + filesChangedMaximum + " file(s)");
     }
 
     var changes = "";
@@ -57,19 +52,27 @@ async function run() {
         });
       });
     });
-    if (changes.indexOf(diffContains) < 0) {
-      core.setFailed("The added code does not contain " + diffContains);
-    } else {
-      core.exportVariable("diff", changes);
-      core.setOutput("diff", changes);
-    }
 
-    const linesChanged = +core.getInput("linesChanged");
-    if (linesChanged && additions != linesChanged) {
+    if (additionDoesNotContain)
+    {
+        var word_arr = additionDoesNotContain.split(";");
+        word_arr.forEach( (item) => 
+        {
+          if(context.payload.pull_request.body.indexOf(additionDoesNotContain) >= 0)
+          {
+            core.setFailed("The body of the PR should not contain " + item);
+          }
+        })
+    }
+    core.exportVariable("diff", changes);
+    core.setOutput("diff", changes);
+
+    const linesChangedMaximum = +core.getInput("linesChangedMaximum");
+    if (linesChangedMaximum && additions > linesChangedMaximum) {
       const this_msg =
-        "You should change exactly " +
-        linesChanged +
-        " lines(s) and you have changed " +
+        "Cannot submit a PR whose additions include more than " +
+        linesChangedMaximum +
+        " lines(s). You have changed " +
         additions;
       core.setFailed(this_msg);
     }
